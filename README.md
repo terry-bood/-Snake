@@ -1,2 +1,313 @@
-# -Snake
-snake game
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>我的流暢版貪食蛇 🎮</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: "Microsoft JhengHei", "sans-serif";
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+
+        #score-board {
+            font-size: 26px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #00ffcc;
+            text-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
+        }
+
+        #instructions {
+            font-size: 14px;
+            color: #aaaaaa;
+            margin-bottom: 15px;
+            background-color: #2a2a2a;
+            padding: 8px 15px;
+            border-radius: 5px;
+            border: 1px solid #444444;
+            text-align: center;
+        }
+        .key {
+            background-color: #444444;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-family: monospace;
+            border-bottom: 2px solid #222;
+        }
+
+        #start-btn {
+            background-color: #00ffcc;
+            color: #1a1a1a;
+            border: none;
+            padding: 10px 25px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 10px rgba(0, 255, 204, 0.3);
+        }
+        #start-btn:hover {
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        /* 🟢 用 Canvas 取代原本的 div，自帶硬體加速 */
+        #game-canvas {
+            background-color: #000000;
+            border: 4px solid #555555;
+            border-radius: 8px;
+            box-shadow: 0 0 25px rgba(0,0,0,0.8);
+        }
+
+        #game-over-text {
+            visibility: hidden; /* 改用 visibility 避免撐開畫面造成抖動 */
+            color: #ff3333;
+            font-size: 36px;
+            font-weight: bold;
+            margin-top: 15px;
+            text-shadow: 0 0 10px rgba(255, 51, 51, 0.5);
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="score-board">SCORE: <span id="score">00000</span></div>
+    
+    <div id="instructions">
+        🎮 操作指南：<span class="key">W</span> 向上 | <span class="key">S</span> 向下 | <span class="key">A</span> 向左 | <span class="key">D</span> 向右
+    </div>
+
+    <button id="start-btn" onclick="startGame()">開始遊戲</button>
+
+    <canvas id="game-canvas" width="400" height="400"></canvas>
+    
+    <div id="game-over-text">G A M E   O V E R</div>
+
+    <script>
+        const Row = 20;
+        const Col = 20;
+        const CellSize = 20; // 🟢 每個格子 20x20 像素
+
+        // 取得 Canvas 繪圖上下文
+        const canvas = document.getElementById("game-canvas");
+        const ctx = canvas.getContext("2d");
+
+        const Space = 0;
+        const Body  = 1;
+        const Apple = 2;
+        const Wall  = 9;
+
+        const Up    = 0;
+        const Down  = 1;
+        const Left  = 2;
+        const Right = 3;
+
+        let snake = [];
+        let applePos = {x: 0, y: 0};
+        let direction = Right;
+        let mark = 0; 
+        let gameInterval = null;
+        let inputQueue = []; 
+
+        let map = [];
+        for (let i = 0; i < Row; i++) {
+            map[i] = [];
+            for (let j = 0; j < Col; j++) {
+                if (i === 0 || i === Row - 1 || j === 0 || j === Col - 1) {
+                    map[i][j] = Wall;
+                } else {
+                    map[i][j] = Space;
+                }
+            }
+        }
+
+        function startGame() {
+            if (gameInterval) clearInterval(gameInterval);
+
+            snake = [
+                {x: 5, y: 5}, 
+                {x: 4, y: 5}, 
+                {x: 3, y: 5}  
+            ];
+            direction = Right;
+            mark = 0;
+            inputQueue = [];
+            
+            document.getElementById("game-over-text").style.visibility = "hidden";
+            
+            randApple();
+            drawGame();
+
+            // 🟢 速度優化：從 300ms 縮短到 130ms，大幅提升反應速度與流暢感
+            gameInterval = setInterval(gameLoop, 200);
+            document.getElementById("start-btn").blur();
+            document.getElementById("start-btn").innerText = "重新開始";
+        }
+
+        function randApple() {
+            while (true) {
+                let x = Math.floor(Math.random() * Col);
+                let y = Math.floor(Math.random() * Row);
+
+                if (map[y][x] === Space) {
+                    let onSnake = false;
+                    for (let i = 0; i < snake.length; i++) {
+                        if (snake[i].x === x && snake[i].y === y) {
+                            onSnake = true;
+                            break;
+                        }
+                    }
+                    if (onSnake) continue;
+
+                    applePos.x = x;
+                    applePos.y = y;
+                    break;
+                }
+            }
+        }
+
+        // 🟢 核心改動：改用 Canvas 繪製像素，絲滑不卡頓
+        function drawGame() {
+            // 1. 清空畫布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 2. 先拷貝一份地圖底層
+            let frame = [];
+            for (let i = 0; i < Row; i++) {
+                frame[i] = [...map[i]];
+            }
+            // 3. 疊加蛇與蘋果
+            for (let i = 0; i < snake.length; i++) {
+                frame[snake[i].y][snake[i].x] = Body;
+            }
+            frame[applePos.y][applePos.x] = Apple;
+
+            // 4. 開始在畫布上著色
+            for (let i = 0; i < Row; i++) {
+                for (let j = 0; j < Col; j++) {
+                    let x = j * CellSize;
+                    let y = i * CellSize;
+
+                    switch (frame[i][j]) {
+                        case Wall:
+                            ctx.fillStyle = "#3a3a3a"; // 牆壁：深灰色
+                            ctx.fillRect(x, y, CellSize, CellSize);
+                            // 加個小外框讓牆壁看起來有磚塊感
+                            ctx.strokeStyle = "#555555";
+                            ctx.strokeRect(x, y, CellSize, CellSize);
+                            break;
+
+                        case Body:
+                            // 蛇頭用亮綠色，蛇身用一般綠色
+                            ctx.fillStyle = (j === snake[0].x && i === snake[0].y) ? "#00ffcc" : "#00aa77";
+                            // 繪製稍微縮小一點點的方塊(18x18)，留出間隙，看起來會一節一節的很精緻
+                            ctx.fillRect(x + 1, y + 1, CellSize - 2, CellSize - 2);
+                            break;
+
+                        case Apple:
+                            ctx.fillStyle = "#ff4444"; // 蘋果：亮紅色
+                            // 把蘋果畫成圓形，視覺效果更好！
+                            ctx.beginPath();
+                            ctx.arc(x + CellSize/2, y + CellSize/2, CellSize/2 - 2, 0, Math.PI * 2);
+                            ctx.fill();
+                            break;
+
+                        case Space:
+                            // 空地保持畫布底色（黑色），不特別畫東西
+                            break;
+                    }
+                }
+            }
+
+            // 更新分數
+            document.getElementById("score").textContent = mark.toString().padStart(5, '0');
+        }
+
+        function handleInput() {
+            if (inputQueue.length === 0) return;
+            let nextKey = inputQueue.shift();
+
+            switch (nextKey) {
+                case "w": if (direction !== Down) direction = Up; break;
+                case "s": if (direction !== Up) direction = Down; break;
+                case "a": if (direction !== Right) direction = Left; break;
+                case "d": if (direction !== Left) direction = Right; break;
+            }
+        }
+
+        function moveSnake() {
+            let next = { x: snake[0].x, y: snake[0].y };
+
+            if (direction === Up)    next.y--;
+            if (direction === Down)  next.y++;
+            if (direction === Left)  next.x--;
+            if (direction === Right) next.x++;
+
+            if (next.y < 0 || next.y >= Row || next.x < 0 || next.x >= Col) return true; 
+
+            let hitSelf = false;
+            for (let i = 0; i < snake.length; i++) {
+                if (snake[i].x === next.x && snake[i].y === next.y) {
+                    hitSelf = true;
+                    break;
+                }
+            }
+
+            if (map[next.y][next.x] === Wall || hitSelf) return true; 
+
+            if (next.x === applePos.x && next.y === applePos.y) {
+                snake.unshift(next); 
+                mark++;              
+                randApple();         
+            } else {
+                snake.unshift(next); 
+                snake.pop();         
+            }
+            return false;
+        }
+
+        window.addEventListener("keydown", function(event) {
+            let key = event.key.toLowerCase();
+            if (["w", "a", "s", "d"].includes(key)) {
+                if (inputQueue.length < 2) {
+                    inputQueue.push(key);
+                }
+            }
+        });
+
+        function gameLoop() {
+            handleInput();
+            if (moveSnake()) {
+                clearInterval(gameInterval); 
+                document.getElementById("game-over-text").style.visibility = "visible";
+                document.getElementById("start-btn").innerText = "再玩一次";
+            }
+            drawGame(); // 移動完馬上重畫
+        }
+
+        // 網頁開啟時先繪製一次初始畫面
+        drawGame();
+    </script>
+</body>
+</html>
