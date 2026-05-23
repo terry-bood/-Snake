@@ -65,7 +65,7 @@
             transform: translateY(-2px);
         }
 
-        /* 🟢 用 Canvas 取代原本的 div，自帶硬體加速 */
+       
         #game-canvas {
             background-color: #000000;
             border: 4px solid #555555;
@@ -74,7 +74,7 @@
         }
 
         #game-over-text {
-            visibility: hidden; /* 改用 visibility 避免撐開畫面造成抖動 */
+            visibility: hidden; 
             color: #ff3333;
             font-size: 36px;
             font-weight: bold;
@@ -107,9 +107,9 @@
     <script>
         const Row = 20;
         const Col = 20;
-        const CellSize = 20; // 🟢 每個格子 20x20 像素
+        const CellSize = 20;
 
-        // 取得 Canvas 繪圖上下文
+      
         const canvas = document.getElementById("game-canvas");
         const ctx = canvas.getContext("2d");
 
@@ -159,7 +159,7 @@
             randApple();
             drawGame();
 
-            // 🟢 速度優化：從 300ms 縮短到 130ms，大幅提升反應速度與流暢感
+            
             gameInterval = setInterval(gameLoop, 200);
             document.getElementById("start-btn").blur();
             document.getElementById("start-btn").innerText = "重新開始";
@@ -187,23 +187,23 @@
             }
         }
 
-        // 🟢 核心改動：改用 Canvas 繪製像素，絲滑不卡頓
+        
         function drawGame() {
-            // 1. 清空畫布
+           
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 2. 先拷貝一份地圖底層
+           
             let frame = [];
             for (let i = 0; i < Row; i++) {
                 frame[i] = [...map[i]];
             }
-            // 3. 疊加蛇與蘋果
+           
             for (let i = 0; i < snake.length; i++) {
                 frame[snake[i].y][snake[i].x] = Body;
             }
             frame[applePos.y][applePos.x] = Apple;
 
-            // 4. 開始在畫布上著色
+            
             for (let i = 0; i < Row; i++) {
                 for (let j = 0; j < Col; j++) {
                     let x = j * CellSize;
@@ -211,36 +211,33 @@
 
                     switch (frame[i][j]) {
                         case Wall:
-                            ctx.fillStyle = "#3a3a3a"; // 牆壁：深灰色
+                            ctx.fillStyle = "#3a3a3a"; 
                             ctx.fillRect(x, y, CellSize, CellSize);
-                            // 加個小外框讓牆壁看起來有磚塊感
+                            
                             ctx.strokeStyle = "#555555";
                             ctx.strokeRect(x, y, CellSize, CellSize);
                             break;
 
                         case Body:
-                            // 蛇頭用亮綠色，蛇身用一般綠色
+                            
                             ctx.fillStyle = (j === snake[0].x && i === snake[0].y) ? "#00ffcc" : "#00aa77";
-                            // 繪製稍微縮小一點點的方塊(18x18)，留出間隙，看起來會一節一節的很精緻
+                    
                             ctx.fillRect(x + 1, y + 1, CellSize - 2, CellSize - 2);
                             break;
 
                         case Apple:
-                            ctx.fillStyle = "#ff4444"; // 蘋果：亮紅色
-                            // 把蘋果畫成圓形，視覺效果更好！
+                            ctx.fillStyle = "#ff4444"; 
                             ctx.beginPath();
                             ctx.arc(x + CellSize/2, y + CellSize/2, CellSize/2 - 2, 0, Math.PI * 2);
                             ctx.fill();
                             break;
 
                         case Space:
-                            // 空地保持畫布底色（黑色），不特別畫東西
                             break;
                     }
                 }
             }
 
-            // 更新分數
             document.getElementById("score").textContent = mark.toString().padStart(5, '0');
         }
 
@@ -303,10 +300,8 @@
                 document.getElementById("game-over-text").style.visibility = "visible";
                 document.getElementById("start-btn").innerText = "再玩一次";
             }
-            drawGame(); // 移動完馬上重畫
+            drawGame();
         }
-
-        // 網頁開啟時先繪製一次初始畫面
         drawGame();
     </script>
 </body>
